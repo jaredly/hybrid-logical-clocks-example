@@ -1,0 +1,11 @@
+{
+    "dependencies": {
+        "flow-bin": "^0.115.0",
+        "parcel": "^1.12.4",
+        "react": "^16.0.0",
+        "react-dom": "^16.12.0"
+    },
+    "scripts": {
+        "start": "parcel index.html"
+    }
+}
