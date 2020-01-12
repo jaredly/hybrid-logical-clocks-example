@@ -15,6 +15,26 @@ export type HLC = {
     node: string,
 };
 
+export const pack = ({ ts, count, node }: HLC) => {
+    // 13 digits is enough for the next 100 years, so this is probably fine
+    return (
+        ts.toString().padStart(15, '0') +
+        ':' +
+        count.toString(36).padStart(5, '0') +
+        ':' +
+        node
+    );
+};
+
+export const unpack = (serialized: string) => {
+    const [ts, count, ...node] = serialized.split(':');
+    return {
+        ts: parseInt(ts),
+        count: parseInt(count, 36),
+        node: node.join(':'),
+    };
+};
+
 export const init = (node: string, now: number): HLC => ({
     ts: now,
     count: 0,
