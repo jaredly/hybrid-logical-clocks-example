@@ -2,8 +2,8 @@
 import React from 'react';
 import { render } from 'react-dom';
 
-import * as hlc from './hlc';
-import type { HLC } from './hlc';
+import * as hlc from '../shared/hlc';
+import type { HLC } from '../shared/hlc';
 
 type State = {|
     nodes: { [key: string]: NodeT },
