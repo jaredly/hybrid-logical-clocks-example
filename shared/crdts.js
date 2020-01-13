@@ -4,52 +4,6 @@
 // commutative = merge(a, b)           === merge(b, a)
 // associative = merge(a, merge(b, c)) === merge(merge(a, b), c)
 
-// } | {
-//     // hmm so deletes are illegal maybe?
-//     type: 'delete',
-//     path: Array<string>,
-
-type Path = {
-    table: string,
-    row: string,
-    column: string,
-};
-// Can I just do Path = Array<string>?
-// Would that violate something, to be able to delete something higher up
-// Ooh and what do I do it I try to set a row and it's not there? I think I skip it.
-// Like, just skip it.
-// And we assume -- you can't actually change something if it hasn't been created.
-// Now the reason I'm allowed to do this, is I don't have a peer-to-peer network.
-// Everything goes through a central hub.
-// And so there's no danger of "me hearing about update message X before create message Y"
-// Right?
-// So I think that means I can have a more lax version of CRDTs. Like, yes messages
-// might be applied out of order ... but ... like ... maybe not too much?
-//
-// I should sit down and think about the case where something gets deleted from under you.
-// If I'm processing a `set` for an object that doesn't exist, what do I do?
-// I ignore it.
-// buuut ok maybe here's the rub. How do I decide "winning" between a "clear the object"
-// and a "set the thing", when the set happened after the clear?
-
-// [
-//     {type: 'set', path: ['id1', 'types'], value: {code: {language: 'javascript'}}},
-//     // between these two, whatever order they're received in, I can know that
-//     // "an 'earler' set of a higher thing should still be applied..."
-//     // and the second one will be ignored
-//     {type: 'set', path: ['id1', 'types'], value: null},
-//     {type: 'set', path: ['id1', 'types', 'code', 'language'], value: 'python'},
-// ];
-// [
-//     {type: 'set', path: ['id1', 'types'], value: {code: {language: 'javascript'}}},
-//     // andd here's the rub.
-//     // the second "set" should win over the first one, but it won't.
-//     // So maybe I can't do this.
-//     // ok but I can have a "multiset" to cut down on postage
-//     {type: 'set', path: ['id1', 'types'], value: {code: {language: 'java'}}},
-//     {type: 'set', path: ['id1', 'types', 'code', 'language'], value: 'python'},
-// ];
-
 // ok so the map we have, each item needs a timestamp, right?
 // yeah so you know whether to apply the deal.
 type CRDTMapInner = { [key: string]: { hlcStamp: string, value: any } };
@@ -77,6 +31,64 @@ class CRDTMap<T: {}> {
     }
 }
 
+const setFull = (map, key, value, hlcStamp) => {
+    return { ...map, [key]: { value, hlcStamp } };
+};
+
+const set = (map, key, value, hlcStamp) => {
+    return {
+        v: { ...map.v, [key]: value },
+        t: { ...map.t, [key]: hlcStamp },
+    };
+};
+
+const createFull = (map, hlcStamp) => {
+    const res = { $alive: { value: true, hlcStamp } };
+    Object.keys(map).forEach(k => {
+        res[k] = { value: map[k], hlcStamp };
+    });
+    return res;
+};
+
+const create = (map, hlcStamp) => {
+    const res = { v: {}, t: { $alive: { value: true, hlcStamp } } };
+    Object.keys(map).forEach(k => {
+        res.v[k] = map[k];
+        res.t[k] = hlcStamp;
+    });
+    return res;
+};
+
+const mergeAttribute = (one, two) => {
+    if (!one) return two;
+    if (!two) return one;
+    return one.hlcStamp < two.hlcStamp ? two : one;
+};
+
+const mergeFull = (one, two) => {
+    const res = {};
+    Object.keys(one).forEach(k => {
+        res[k] = mergeAttribute(one[k], two[k]);
+    });
+    Object.keys(two).forEach(k => {
+        res[k] = mergeAttribute(one[k], two[k]);
+    });
+    return res;
+};
+
+const merge = (one, two) => {
+    const res = {
+        v: {},
+        t: { $alive: mergeAttribute(one.t['$alive'], two.t['$alive']) },
+    };
+    Object.keys(one.v).forEach(k => {
+        res[k] = mergeAttribute(one[k], two[k]);
+    });
+    Object.keys(two.v).forEach(k => {
+        res[k] = mergeAttribute(one[k], two[k]);
+    });
+};
+
 /*
 
 // full, in-line representation
@@ -84,38 +96,105 @@ const map = {
     x: {value: 1, hlcStamp: 's1'},
     y: {value: 2, hlcStamp: 's2'},
     z: {value: false, hlcStamp: 's3'},
-    $created: [1, 0],
+    $alive: {value: true, hlcStamp: 's4'},
 }
 const deletedMap = {
-    x: {value: 5, hlcStamp: 's4'},
+    x: {value: 5, hlcStamp: 's6'},
     y: {value: 2, hlcStamp: 's2'},
     z: {value: false, hlcStamp: 's3'},
-    $created: [1, 1],
+    $alive: {value: false, hlcStamp: 's5'},
+}
+const nestedMap = {
+    x: {value: 1, hlcStamp: 's1'},
+    person: {
+        name: {value: 'Julia', hlcStamp: 's1'},
+        address: {value: '123 Place', hlcStamp: 's1'},
+        $alive: {value: true, hlcStamp: 's1'},
+    },
+    $alive: {value: true, hlcStamp: 's1'}
+}
+// and we need, like, schema metadata.... right?
+// or I guess we could just infer it based on the shape of things...
+// and then it would be an error to change the type of a value?
+
+// OK so maybe the rule is just:: 'plain' wins over 'map'? Like merging a plain v with a map, regardless of stamps, the plain wins?
+// that's a decent rule I guess. It would torch you if you make a mistake though.
+
+// another option would be to do the "hang on to metadata" thing ... which honestly would
+// make the "deletion" handling potentially kinda elegant. hmmm
+const mapWithStringThatUsedToBeMap = {
+    x: {value: 1, hlcStamp: 's1'},
+    // because this is obviously a nested map, from the `$alive` key
+    person: {
+        value: 'Jules',
+        hlcStamp: 's2',
+        mapAttributes: {
+            name: {value: 'Jules', hlcStamp: 's10'},
+            address: {value: '123 Place', hlcStamp: 's1'},
+            $alive: {value: true, hlcStamp: 's1'},
+        }
+    },
+    $alive: {value: false, hlcStamp: 's2'}
+}
+// Sooo then the "map" values would be wrapped, if they are going to be deletable.
+const deletedMap = {
+    value: null,
+    hlcStamp: 's2',
+    mapAttributes: {x: 5, hlcStamp: 's5'} // any attributes that are "newer" than the top level stamp.
+}
+/// huhhhh that seems a little too tidy to me. Could it be that easy?
+
+
+
+const deletedNestedMap = {
+    x: {value: 1, hlcStamp: 's1'},
+    // because this is obviously a nested map, from the `$alive` key
+    person: {
+        name: {value: 'Jules', hlcStamp: 's10'},
+        address: {value: '123 Place', hlcStamp: 's1'},
+        $alive: {value: true, hlcStamp: 's1'},
+    },
+    $alive: {value: false, hlcStamp: 's2'}
 }
 
 // a representation that optimizes for direct use in javascript.
 // `v` is the "plain js object"
 const map = {
     v: {x: 1, y: 2, z: false},
-    t: {x: 's1', y: 's2', z: 's3'},
-    created: [1, 0], // 1 creation, 0 deletions
+    t: {x: 's1', y: 's2', z: 's3', $alive: {value: true, hlcStamp: 's4'}},
 }
 const deletedMap = {
-    // hermmmm I need a timestamp for the "v null" though? idk
-    // I guess as long as the created counter hasn't been incremented,
-    // we don't need to worry about that?
     v: null,
-    t: {x: 's4', y: 's2', z: 's3'},
-    pendingAttributes: {x: 5}, // got 
-    created: [1, 1], // 1 creation, 1 deletion
+    t: {x: 's6', y: 's2', z: 's3', $alive: {value: false, hlcStamp: 's5'}, $pending: {x: 5}},
+}
+const nestedMap = {
+    v: {x: 1, person: {name: 'Julia', address: '123 Place'}},
+    t: {
+        x: 's1',
+        person: {
+            name: 's1',
+            address: 's1',
+            $alive: {value: true, hlcStamp: 's1'}
+        },
+        $alive: {value: true, hlcStamp: 's1'}
+    },
+}
+const nestedMap = {
+    v: {x: 1, person: {name: 'Jules', address: '123 Place'}},
+    t: {
+        x: 's1',
+        person: {
+            name: 's10',
+            address: 's1',
+            $alive: {value: true, hlcStamp: 's1'}
+        },
+        $alive: {value: false, hlcStamp: 's2'}
+    },
 }
 // I'd want to ~prove that this representation still satisfies all the properties.
 
 
 */
-
-// where the "tombstone bit" is concerned, I can remove the object entirely and just
-// maintain a separate set of "tombstone ids", which would save on storage space.
 
 // const v: { a: number, b: string } = { a: 0, b: 'hi' };
 // const m = new CRDTMap(v, '000');
@@ -137,11 +216,11 @@ type CRDT =
           path: Array<string>,
           value: any,
       }
-    | {
-          type: 'ot',
-          path: Path,
-          ops: Array<any>,
-      }
+    // | {
+    //       type: 'ot',
+    //       path: Path,
+    //       ops: Array<any>,
+    //   }
     | {
           type: 'insert',
       };
