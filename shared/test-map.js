@@ -1,0 +1,108 @@
+// @flow
+// import {create, createMap, merge}
+require('@babel/register')({ presets: ['@babel/preset-flow'] });
+
+/* So, re-living map set scenarios:
+Clients A and B
+
+- we have a node with a {types: {code: {language: 'javascript'}}}
+- A deletes types:code
+- A recreates types:code w/ language 'java'
+- B sets language to 'perl'
+- they sync
+
+>> in this case, you could argue that the language should be 'java', not 'perl'
+>> but I'm pretty sure we don't have a way to make that happen.
+
+- we have a node with a {types: {code: {language: 'javascript'}}}
+- A deletes types:code
+- A syncs to C & B
+- C recreates types:code w/ language 'java'
+- C syncs to B
+- B sets language to 'perl'
+- B's last message syncs to A, before the recreate message.
+
+>> in this case, the language should definitely be 'perl'
+
+*/
+
+const {
+    value,
+    createDeepMap,
+    set,
+    remove,
+    create,
+    merge,
+    removeAt,
+    show,
+} = require('./plain-always-wins');
+
+let id = 0;
+const tick = () => {
+    return (id++).toString().padStart(1, '0');
+};
+
+// first
+const orig = createDeepMap(
+    { text: 'var x = 5', types: { code: { language: 'javascript' } } },
+    tick(),
+);
+const all = [orig];
+const removed = removeAt(orig, ['types'], tick());
+all.push(removed);
+all.push(
+    set(
+        removed,
+        ['types'],
+        createDeepMap({ code: { language: 'java' } }, tick()),
+        // tick(),
+    ),
+);
+all.push(set(orig, ['types', 'code', 'language'], create('perl', tick())));
+
+// all permutations of these should resolve to the same thing.
+function permute(rest, prefix = []) {
+    if (rest.length === 0) {
+        return [prefix];
+    }
+    return (
+        rest
+            .map((x, index) => {
+                const oldRest = rest;
+                const oldPrefix = prefix;
+                // the `...` destructures the array into single values flattening it
+                const newRest = rest
+                    .slice(0, index)
+                    .concat(rest.slice(index + 1));
+                const newPrefix = prefix.concat([x]);
+
+                const result = permute(newRest, newPrefix);
+                return result;
+            })
+            // this step flattens the array of arrays returned by calling permute
+            .reduce((flattened, arr) => [...flattened, ...arr], [])
+    );
+}
+
+const chalk = require('chalk');
+
+const evaluate = permutation => {
+    let result = permutation[0];
+    console.log(` (${0}):`, show(result));
+    // console.log(`     -->`, value(result));
+    for (let i = 1; i < permutation.length; i++) {
+        result = merge(result, permutation[i]);
+        console.log(` (${i}):`, show(permutation[i]));
+        console.log(`  -->`, chalk.green(show(result)));
+    }
+    return result;
+};
+permute(all).forEach((permutation, i) => {
+    console.log(i);
+    // permutation.forEach((p, i) => {
+    //     console.log(` (${i}):`, show(p));
+    // });
+    console.log('-->', JSON.stringify(value(evaluate(permutation))));
+});
+
+console.log('ok');
