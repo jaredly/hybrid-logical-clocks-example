@@ -128,9 +128,9 @@ const mergeMaps = (one: MapCRDT, two: MapCRDT) => {
     };
 };
 
-// how bout that, plain always wins.
+// I don't love this...
 const mergePlainAndMap = (map: MapCRDT, plain: PlainCRDT<any>) => {
-    return plain;
+    throw new Error('Schema change detected! Invalid state');
 };
 const mergePlain = (one: PlainCRDT<any>, two: PlainCRDT<any>) => {
     return one.hlcStamp > two.hlcStamp ? one : two;
