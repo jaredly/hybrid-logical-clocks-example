@@ -108,4 +108,9 @@ permute(all).forEach((permutation, i) => {
 });
 
 console.log('ok');
-console.log('Results', Object.keys(results).join('\n'));
+console.log(
+    'Results',
+    Object.keys(results)
+        .map(k => `${results[k].length} : ${k}`)
+        .join('\n'),
+);

@@ -11,8 +11,6 @@ type PlainCRDT<T> = {
     hlcStamp: string,
 };
 
-// who wins? plain > option > map
-
 type CRDT = MapCRDT | PlainCRDT<any>;
 
 const show = (crdt: CRDT) => {
@@ -74,6 +72,10 @@ const createMap = (value, hlcStamp): MapCRDT => {
     return { type: 'map', map, hlcStamp, alive: create(true, hlcStamp) };
 };
 
+const notAMap = (v, msg) => {
+    throw new Error(`Not a map, cannot ${msg}: ${show(v)}`);
+};
+
 const removeAt = (
     map: MapCRDT,
     key: Array<string>,
@@ -86,8 +88,9 @@ const removeAt = (
             [key[0]]:
                 key.length === 1
                     ? merge(map.map[key[0]], remove(map.map[key[0]], hlcStamp))
-                    : // TODO account for plain here I think
-                      removeAt(map.map[key[0]], key.slice(1), hlcStamp),
+                    : map.map[key[0]].type === 'map'
+                    ? removeAt(map.map[key[0]], key.slice(1), hlcStamp)
+                    : notAMap(map.map[key[0]], 'remoteAt'),
         },
     };
 };
@@ -102,8 +105,9 @@ const set = (map: MapCRDT, key: Array<string>, value: CRDT): MapCRDT => {
                     ? map.map[key[0]]
                         ? merge(map.map[key[0]], value)
                         : value
-                    : // TODO account for plain here I think
-                      set(map.map[key[0]], key.slice(1), value),
+                    : map.map[key[0]].type === 'map'
+                    ? set(map.map[key[0]], key.slice(1), value)
+                    : notAMap(map.map[key[0]], 'set'),
         },
     };
 };

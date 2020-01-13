@@ -86,8 +86,9 @@ const removeAt = (
             [key[0]]:
                 key.length === 1
                     ? merge(map.map[key[0]], remove(map.map[key[0]], hlcStamp))
-                    : // TODO account for plain here I think
-                      removeAt(map.map[key[0]], key.slice(1), hlcStamp),
+                    : map.map[key[0]].type === 'plain'
+                    ? map.map[key[0]]
+                    : removeAt(map.map[key[0]], key.slice(1), hlcStamp),
         },
     };
 };
@@ -102,8 +103,9 @@ const set = (map: MapCRDT, key: Array<string>, value: CRDT): MapCRDT => {
                     ? map.map[key[0]]
                         ? merge(map.map[key[0]], value)
                         : value
-                    : // TODO account for plain here I think
-                      set(map.map[key[0]], key.slice(1), value),
+                    : map.map[key[0]].type === 'plain'
+                    ? map.map[key[0]]
+                    : set(map.map[key[0]], key.slice(1), value),
         },
     };
 };
