@@ -56,6 +56,7 @@ export class Server<CRDT, Data> {
     addEvents(clientId: string, events: Array<ClientEvent<CRDT>>) {
         // apply the events to the data
         events.forEach(event => {
+            // TODO persist folks
             this.data = this.config.apply(this.data, event.change);
         });
         const serverEvents = events.map((evt, i) => ({
