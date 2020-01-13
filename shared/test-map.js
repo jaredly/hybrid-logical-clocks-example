@@ -44,7 +44,8 @@ const orig = createDeepMap(
 const all = [orig];
 const removed = removeAt(orig, ['types'], tick());
 all.push(removed);
-all.push(set(orig, ['types', 'plain'], create(true, tick())));
+// all.push(set(orig, ['types', 'plain'], create(true, tick())));
+all.push(set(orig, ['types', 'code'], create(5, tick())));
 all.push(
     set(
         removed,
@@ -83,28 +84,25 @@ const chalk = require('chalk');
 
 const evaluate = permutation => {
     let result = permutation[0];
-    // console.log(` (${0}):`, show(result));
+    console.log(` (${0}):`, show(result));
     // console.log(`     -->`, value(result));
     for (let i = 1; i < permutation.length; i++) {
         result = merge(result, permutation[i]);
-        // console.log(` (${i}):`, show(permutation[i]));
-        // console.log(`  -->`, chalk.green(show(result)));
+        console.log(` (${i}):`, show(permutation[i]));
+        console.log(`  -->`, chalk.green(show(result)));
     }
     return result;
 };
 const results = {};
 permute(all).forEach((permutation, i) => {
-    // console.log(i);
-    // permutation.forEach((p, i) => {
-    //     console.log(` (${i}):`, show(p));
-    // });
+    console.log(i);
     const res = evaluate(permutation);
     const raw = JSON.stringify(value(res));
     if (!results[raw]) {
         results[raw] = [];
     }
     results[raw].push([i, permutation]);
-    // console.log('-->', JSON.stringify(value(res)));
+    console.log('-->', JSON.stringify(value(res)));
 });
 
 console.log('ok');
