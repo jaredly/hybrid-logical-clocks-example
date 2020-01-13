@@ -13,7 +13,68 @@ type PlainCRDT<T> = {
 
 // who wins? plain > option > map
 
-type CRDT = MapCRDT | PlainCRDT<any>;
+export type CRDT = MapCRDT | PlainCRDT<any>;
+
+export type Delta =
+    | { type: 'replace', value: any, hlcStamp: string }
+    | {
+          type: 'set',
+          path: Array<string>,
+          value: CRDT,
+          // Do I need a separate hlcStamp for the operation itself?
+      }
+    | { type: 'remove', hlcStamp: string }
+    | {
+          type: 'removeAt',
+          path: Array<string>,
+          hlcStamp: string,
+      };
+
+const showDelta = (delta: Delta) => {
+    switch (delta.type) {
+        case 'replace':
+            return `<replace> ${delta.hlcStamp} ${show(delta.value)}`;
+        case 'remove':
+            return `<remove> ${delta.hlcStamp}`;
+        case 'removeAt':
+            return `<removeAt> ${delta.hlcStamp} ${delta.path.join(':')}`;
+        case 'set':
+            return `<set> ${delta.path.join(':')} ${show(delta.value)}`;
+    }
+};
+
+const deltas = {
+    set: (path: Array<string>, value: CRDT) => ({ type: 'set', path, value }),
+    removeAt: (path: Array<string>, hlcStamp: string) => ({
+        type: 'removeAt',
+        path,
+        hlcStamp,
+    }),
+};
+
+const applyDelta = (crdt: CRDT, delta: Delta): CRDT => {
+    switch (delta.type) {
+        case 'remove':
+            return merge(crdt, remove(crdt, delta.hlcStamp));
+        case 'removeAt':
+            if (crdt.type === 'map') {
+                return removeAt(crdt, delta.path, delta.hlcStamp);
+            } else {
+                return crdt;
+                // throw new Error('Not a map, cant remove')
+            }
+        case 'replace':
+            return merge(crdt, create(delta.value, delta.hlcStamp));
+        case 'set':
+            if (crdt.type === 'map') {
+                return set(crdt, delta.path, delta.value);
+            } else {
+                return crdt;
+                // throw new Error('Not a map, cant remove')
+            }
+    }
+    throw new Error('unknown delta type');
+};
 
 const show = (crdt: CRDT) => {
     if (crdt.type === 'plain') {
@@ -160,4 +221,7 @@ module.exports = {
     remove,
     removeAt,
     show,
+    deltas,
+    applyDelta,
+    showDelta,
 };

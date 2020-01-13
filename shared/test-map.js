@@ -26,10 +26,26 @@ Clients A and B
 
 */
 
-const { value, createDeepMap, set, remove, create, merge, removeAt, show } =
+/*::
+import type {Delta} from './plain-always-wins';
+*/
+
+const {
+    value,
+    createDeepMap,
+    set,
+    remove,
+    create,
+    merge,
+    removeAt,
+    show,
+    deltas,
+    applyDelta,
+    showDelta,
+} =
     // require('./no-schema-change');
-    // require('./plain-always-wins');
-    require('./plain-always-retains');
+    // require('./plain-always-retains');
+    require('./plain-always-wins');
 
 let id = 0;
 const tick = () => {
@@ -41,6 +57,17 @@ const orig = createDeepMap(
     { text: 'var x = 5', types: { code: { language: 'javascript' } } },
     tick(),
 );
+
+const allDeltas = [
+    deltas.removeAt(['types'], tick()),
+    deltas.set(['types', 'code'], create(5, tick())),
+    deltas.set(
+        ['types'],
+        createDeepMap({ code: { language: 'java' } }, tick()),
+    ),
+    deltas.set(['types', 'code', 'language'], create('perl', tick())),
+];
+
 const all = [orig];
 const removed = removeAt(orig, ['types'], tick());
 all.push(removed);
@@ -93,10 +120,35 @@ const evaluate = permutation => {
     }
     return result;
 };
+
+const evaluateDeltas = (original, permutation) => {
+    let result = original;
+    console.log(` (${0}):`, show(result));
+    // console.log(`     -->`, value(result));
+    for (let i = 0; i < permutation.length; i++) {
+        result = applyDelta(result, permutation[i]);
+        console.log(` (${i}):`, showDelta(permutation[i]));
+        console.log(`  -->`, chalk.green(show(result)));
+    }
+    return result;
+};
+
 const results = {};
+
 permute(all).forEach((permutation, i) => {
     console.log(i);
     const res = evaluate(permutation);
+    const raw = JSON.stringify(value(res));
+    if (!results[raw]) {
+        results[raw] = [];
+    }
+    results[raw].push([i, permutation]);
+    console.log('-->', JSON.stringify(value(res)));
+});
+
+permute(allDeltas).forEach((permutation, i) => {
+    console.log(i);
+    const res = evaluateDeltas(orig, permutation);
     const raw = JSON.stringify(value(res));
     if (!results[raw]) {
         results[raw] = [];
