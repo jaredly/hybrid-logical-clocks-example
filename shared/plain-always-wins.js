@@ -37,9 +37,9 @@ const showDelta = (delta: Delta) => {
         case 'remove':
             return `<remove> ${delta.hlcStamp}`;
         case 'removeAt':
-            return `<removeAt> ${delta.hlcStamp} ${delta.path.join(':')}`;
+            return `<removeAt> ${delta.hlcStamp} [${delta.path.join(':')}]`;
         case 'set':
-            return `<set> ${delta.path.join(':')} ${show(delta.value)}`;
+            return `<set> [${delta.path.join(':')}] ${show(delta.value)}`;
     }
 };
 
@@ -151,10 +151,10 @@ const removeAt = (
         map: {
             ...map.map,
             [key[0]]:
-                key.length === 1
-                    ? merge(map.map[key[0]], remove(map.map[key[0]], hlcStamp))
-                    : map.map[key[0]].type === 'plain'
+                map.map[key[0]].type === 'plain'
                     ? map.map[key[0]]
+                    : key.length === 1
+                    ? merge(map.map[key[0]], remove(map.map[key[0]], hlcStamp))
                     : removeAt(map.map[key[0]], key.slice(1), hlcStamp),
         },
     };
