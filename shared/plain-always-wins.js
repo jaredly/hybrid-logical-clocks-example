@@ -73,13 +73,16 @@ const applyDelta = (crdt: CRDT, delta: Delta): CRDT => {
                 // throw new Error('Not a map, cant remove')
             }
     }
-    throw new Error('unknown delta type');
+    throw new Error('unknown delta type' + JSON.stringify(delta));
 };
 
 const show = (crdt: CRDT) => {
     if (crdt.type === 'plain') {
         return JSON.stringify(crdt.value) + '=' + crdt.hlcStamp;
     } else {
+        if (!crdt.alive) {
+            throw new Error('Nope ' + JSON.stringify(crdt));
+        }
         const res = [];
         res.push(
             `${crdt.alive.value ? 'alive' : 'dead'}=${crdt.alive.hlcStamp}`,
@@ -100,6 +103,9 @@ const remove = (crdt: CRDT, ts: string): CRDT => {
 };
 
 const value = (crdt: CRDT) => {
+    if (!crdt.type) {
+        throw new Error('Nope ' + JSON.stringify(crdt));
+    }
     if (crdt.type === 'plain') {
         return crdt.value;
     } else if (!crdt.alive.value) {

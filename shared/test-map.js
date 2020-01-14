@@ -2,6 +2,8 @@
 // import {create, createMap, merge}
 require('@babel/register')({ presets: ['@babel/preset-flow'] });
 
+const { permute } = require('./permute');
+
 /* So, re-living map set scenarios:
 Clients A and B
 
@@ -82,30 +84,6 @@ all.push(
     ),
 );
 all.push(set(orig, ['types', 'code', 'language'], create('perl', tick())));
-
-// all permutations of these should resolve to the same thing.
-function permute(rest, prefix = []) {
-    if (rest.length === 0) {
-        return [prefix];
-    }
-    return (
-        rest
-            .map((x, index) => {
-                const oldRest = rest;
-                const oldPrefix = prefix;
-                // the `...` destructures the array into single values flattening it
-                const newRest = rest
-                    .slice(0, index)
-                    .concat(rest.slice(index + 1));
-                const newPrefix = prefix.concat([x]);
-
-                const result = permute(newRest, newPrefix);
-                return result;
-            })
-            // this step flattens the array of arrays returned by calling permute
-            .reduce((flattened, arr) => [...flattened, ...arr], [])
-    );
-}
 
 const chalk = require('chalk');
 
