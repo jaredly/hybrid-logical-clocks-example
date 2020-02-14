@@ -93,7 +93,7 @@ export const recv = (local: HLC, remote: HLC, now: number): HLC => {
 // };
 
 const validate = (time: HLC, now: number, maxDrift: number = 60 * 1000) => {
-    if (time.count > 65535) {
+    if (time.count > Math.pow(36,5)) {
         return 'counter-overflow';
     }
     // if a timestamp is more than 1 minute off from our local wall clock, something has gone horribly wrong.
